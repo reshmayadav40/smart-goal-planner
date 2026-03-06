@@ -146,12 +146,8 @@ exports.updateGoal = async (req, res) => {
       parseInt(dailyCapacityMinutes) !== goal.dailyCapacityMinutes;
     const typeChanged = goalType !== goal.goalType;
 
-    // Date comparison
     const newStart = new Date(startDate);
-    const newEnd =
-      goalType === "daily"
-        ? addDays(new Date(startDate), 1)
-        : new Date(endDate);
+    const newEnd = goalType === "daily" ? newStart : new Date(endDate);
     const startChanged = newStart.getTime() !== goal.startDate.getTime();
     const endChanged = newEnd.getTime() !== goal.endDate.getTime();
 
