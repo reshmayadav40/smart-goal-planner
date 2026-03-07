@@ -135,8 +135,7 @@ const generateSubtopicsFromAI = async (
 
     return {
       subtopics,
-      feasibilityAnalysis:
-        "AI service is currently busy. Generated a high-quality structured roadmap for any topic programmatically!",
+      feasibilityAnalysis: `AI Connection Error: "${error.message}". This usually means your API Key is missing in Render or Google's servers are busy. Please check your Render "Environment" settings!`,
     };
   }
 };
