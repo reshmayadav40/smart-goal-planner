@@ -55,13 +55,13 @@ const generateSubtopicsFromAI = async (
       "gemini-1.5-flash",
       "gemini-1.5-flash-latest",
       "gemini-2.0-flash-exp",
-      "gemma-2-27b-it",
-      "gemini-1.5-pro-latest",
-      "gemini-2.5-flash",
-      "gemini-2.5-pro",
-      "gemini 3 flash",
-      "gemini 3 pro",
+      "gemini-1.5-pro",
     ];
+
+    const apiKey = process.env.GEMINI_API_KEY || "";
+    console.log(
+      `AI Config: USE_GEMINI=${process.env.USE_GEMINI}, KeyStart=${apiKey.substring(0, 6)}...`,
+    );
 
     let result;
     let success = false;
