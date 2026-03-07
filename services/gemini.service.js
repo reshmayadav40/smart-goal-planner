@@ -41,11 +41,11 @@ const generateSubtopicsFromAI = async (
     const genAI = new GoogleGenerativeAI(apiKey);
     const modelsToTry = [
       "gemini-1.5-flash",
-      "gemini-1.5-flash-latest",
-      "gemini-pro",
+      "models/gemini-1.5-flash",
       "gemini-1.5-pro",
-      "gemini-1.5-pro-latest",
-      "gemini-2.0-flash-exp",
+      "models/gemini-1.5-pro",
+      "gemini-pro",
+      "models/gemini-pro",
     ];
 
     let result;
@@ -54,8 +54,14 @@ const generateSubtopicsFromAI = async (
 
     for (const modelName of modelsToTry) {
       try {
-        console.log(`AI Attempt: Trying model ${modelName}...`);
-        const activeModel = genAI.getGenerativeModel({ model: modelName });
+        console.log(
+          `AI Attempt: Trying model ${modelName} (forcing v1 API)...`,
+        );
+        // Force v1 API version to bypass v1beta 404s
+        const activeModel = genAI.getGenerativeModel(
+          { model: modelName },
+          { apiVersion: "v1" },
+        );
 
         const prompt = `
           You are an elite educational architect.
