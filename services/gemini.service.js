@@ -225,25 +225,23 @@ const generateSubtopicsFromAI = async (
     const mainTopic = topics[0] || "Learning Goal";
 
     if (totalGoalDays === 1) {
-      // 3 sessions for 1 day, distributing identified topics
-      const morningTopic = toTitleCase(topics[0] || mainTopic);
-      const afternoonTopic = toTitleCase(topics[1] || topics[0] || mainTopic);
-      const eveningTopic = toTitleCase(topics[2] || topics[0] || mainTopic);
+      // 3 sessions for 1 day, giving them distinct purposes instead of repeating themes
+      const baseTitle = toTitleCase(topics[0] || mainTopic);
 
       subtopics.push(
         {
-          title: `Morning: ${morningTopic}`,
-          description: `Focus on fundamentals and key concepts of ${morningTopic} (${Math.floor(dailyCapacityMinutes * 0.3)} mins).`,
+          title: `Morning: ${baseTitle} - Fundamentals`,
+          description: `Focus on the core concepts and basic syntax of ${baseTitle} (${Math.floor(dailyCapacityMinutes * 0.3)} mins).`,
           estimatedMinutes: Math.floor(dailyCapacityMinutes * 0.3),
         },
         {
-          title: `Afternoon: ${afternoonTopic}`,
-          description: `Deep dive practice and intensive exercises for ${afternoonTopic} (${Math.floor(dailyCapacityMinutes * 0.4)} mins).`,
+          title: `Afternoon: ${baseTitle} - Coding Practice`,
+          description: `Hands-on deep dive and intensive coding exercises for ${baseTitle} (${Math.floor(dailyCapacityMinutes * 0.4)} mins).`,
           estimatedMinutes: Math.floor(dailyCapacityMinutes * 0.4),
         },
         {
-          title: `Evening: ${eveningTopic} Complete`,
-          description: `Final review, concluding all tasks for ${overview}, and solving practice questions (${Math.floor(dailyCapacityMinutes * 0.3)} mins).`,
+          title: `Evening: ${baseTitle} - Advanced Review`,
+          description: `Final review, edge cases, and concluding all tasks for ${overview} (${Math.floor(dailyCapacityMinutes * 0.3)} mins).`,
           estimatedMinutes: Math.floor(dailyCapacityMinutes * 0.3),
         },
       );
