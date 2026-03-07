@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require("dotenv").config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialization moved inside functions to pick up fresh process.env
 const useGemini = process.env.USE_GEMINI === "true";
 
 const generateSubtopicsFromAI = async (
@@ -51,17 +51,24 @@ const generateSubtopicsFromAI = async (
   }
 
   try {
+    const apiKey = process.env.GEMINI_API_KEY || "";
+    const keyStart = apiKey.substring(0, 6);
+    const keyEnd =
+      apiKey.length > 10 ? apiKey.substring(apiKey.length - 4) : "...";
+
+    console.log(
+      `AI Config Check: USE_GEMINI=${process.env.USE_GEMINI}, Key=${keyStart}...${keyEnd}`,
+    );
+
+    // Create fresh instance to ensure Render picks up NEW key from process.env
+    const genAI = new GoogleGenerativeAI(apiKey);
+
     const modelsToTry = [
       "gemini-1.5-flash",
-      "gemini-1.5-flash-latest",
       "gemini-2.0-flash-exp",
+      "gemini-1.5-flash-latest",
       "gemini-1.5-pro",
     ];
-
-    const apiKey = process.env.GEMINI_API_KEY || "";
-    console.log(
-      `AI Config: USE_GEMINI=${process.env.USE_GEMINI}, KeyStart=${apiKey.substring(0, 6)}...`,
-    );
 
     let result;
     let success = false;
@@ -69,7 +76,7 @@ const generateSubtopicsFromAI = async (
 
     for (const modelName of modelsToTry) {
       try {
-        console.log(`Attempting AI generation with model: ${modelName}...`);
+        console.log(`AI Attempt: Trying model ${modelName}...`);
         const activeModel = genAI.getGenerativeModel({ model: modelName });
 
         const prompt = `
