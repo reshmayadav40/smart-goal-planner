@@ -41,13 +41,16 @@ const generateSubtopicsFromAI = async (
     const genAI = new GoogleGenerativeAI(apiKey);
     const modelsToTry = [
       "gemini-1.5-flash",
-      "gemini-2.0-flash-exp",
+      "gemini-1.5-flash-latest",
+      "gemini-pro",
       "gemini-1.5-pro",
+      "gemini-1.5-pro-latest",
+      "gemini-2.0-flash-exp",
     ];
 
     let result;
     let success = false;
-    let lastError;
+    let modelErrors = [];
 
     for (const modelName of modelsToTry) {
       try {
@@ -86,18 +89,23 @@ const generateSubtopicsFromAI = async (
         if (parsed.subtopics && Array.isArray(parsed.subtopics)) {
           result = parsed;
           success = true;
+          console.log(`AI Success with model: ${modelName}`);
           break;
         }
       } catch (err) {
-        lastError = err;
-        console.warn(`Model ${modelName} failed: ${err.message}`);
+        const errMsg = err.message || "Unknown error";
+        console.warn(`Model ${modelName} failed: ${errMsg}`);
+        modelErrors.push(`${modelName}: ${errMsg}`);
       }
     }
 
-    if (!success) throw lastError || new Error("AI failed");
+    if (!success) {
+      const errorDetail = modelErrors.join(" | ");
+      throw new Error(`All models failed. Details: ${errorDetail}`);
+    }
     return result;
   } catch (error) {
-    console.error("AI Fallback triggered:", error.message);
+    console.error("AI Fallback triggered. Final Error:", error.message);
     const subtopics = [];
     const toTitleCase = (str) => str.replace(/\b\w/g, (l) => l.toUpperCase());
     const cleanTopic = overview
