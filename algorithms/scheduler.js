@@ -28,33 +28,23 @@ function distributeSubtopics(subtopics, startDate, endDate, dailyCapacity) {
     };
 
     for (const session of ["Morning", "Afternoon", "Evening"]) {
-      if (isMultiDay && assignedForToday) break; // Each day gets exactly one subtopic if multi-day
-
       let sessionCapacity = capacities[session];
 
       while (currentSubtopicIndex < subtopics.length && sessionCapacity > 0) {
         const subtopic = subtopics[currentSubtopicIndex];
         const timeNeeded = subtopic.estimatedMinutes || 60;
 
-        // If it fits in this session (roughly)
-        const buffer = isMultiDay ? 30 : 60; // More flexibility for 1-day goals to fill time
-        if (timeNeeded <= sessionCapacity + buffer) {
-          schedule.push({
-            subtopicId: subtopic._id,
-            assignedDate: currentDate,
-            session: session,
-            plannedMinutes: timeNeeded,
-          });
-          currentSubtopicIndex++;
-          assignedForToday = true;
-
-          if (isMultiDay) break; // Move to next day
-
-          sessionCapacity -= timeNeeded;
-        } else {
-          // Doesn't fit in this session, move to next session
-          break;
-        }
+        // Ensure we fit this into the current session
+        schedule.push({
+          subtopicId: subtopic._id,
+          assignedDate: currentDate,
+          session: session,
+          plannedMinutes: timeNeeded,
+        });
+        currentSubtopicIndex++;
+        
+        sessionCapacity -= timeNeeded;
+        // Even in multi-day, we want all 3 sessions to be populated if the AI provided them
       }
     }
 

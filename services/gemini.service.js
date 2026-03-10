@@ -8,6 +8,7 @@ const generateSubtopicsFromAI = async (
   overview,
   dailyCapacityMinutes,
   totalGoalDays = 1,
+  startDate = new Date()
 ) => {
   const isAiEnabled =
     process.env.USE_GEMINI === "true" && process.env.GEMINI_API_KEY;
@@ -40,78 +41,92 @@ const generateSubtopicsFromAI = async (
     const apiKey = process.env.GEMINI_API_KEY || "";
     const genAI = new GoogleGenerativeAI(apiKey);
     const modelsToTry = [
-      "gemini-1.5-flash",
-      "models/gemini-1.5-flash",
-      "gemini-1.5-pro",
-      "models/gemini-1.5-pro",
-      "gemini-pro",
-      "models/gemini-pro",
+      "gemini-2.5-flash",        // Primary confirmed model
+      "gemini-2.0-flash",        // Modern stable
+      "gemini-flash-latest",     // Alias for newest flash
+      "gemini-flash-lite-latest",
+      "gemini-1.5-flash-002",    // Versioned stable
+      "gemini-1.5-flash-8b",     // High quota/low latency
+      "gemini-1.5-pro-002",      // Pro fallback
     ];
 
     let result;
     let success = false;
     let modelErrors = [];
 
+    const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
+
     for (const modelName of modelsToTry) {
       try {
-        console.log(
-          `AI Attempt: Trying model ${modelName} (forcing v1 API)...`,
-        );
-        // Force v1 API version to bypass v1beta 404s
-        const activeModel = genAI.getGenerativeModel(
-          { model: modelName },
-          { apiVersion: "v1" },
-        );
+        console.log(`AI Attempt: Trying model ${modelName}...`);
+        const activeModel = genAI.getGenerativeModel({ model: modelName });
+        
+        // Add a small 2-second sleep between retries to avoid overlapping transient 503s
+        if (modelErrors.length > 0) {
+           await new Promise(resolve => setTimeout(resolve, 2000));
+        }
 
         const prompt = `
-          You are an elite educational architect.
-          The student wants to master this topic: "${overview}"
-          Daily capacity: ${dailyCapacityMinutes} minutes.
-          Duration: ${totalGoalDays} days.
+          You are an Expert Study Planner.
           
-          Instructions:
-          1. Provide a professional, subject-appropriate study plan.
-          2. If 1 day: Generate EXACTLY 3 sessions (Morning, Afternoon, Evening).
-          3. If >1 day: Generate EXACTLY ${totalGoalDays} subtopics (one for each day).
-          4. Distribution: Spread the ${dailyCapacityMinutes} across the sessions.
-          5. Progression: Logic flow from Foundations to Application to Review.
+          GOAL DETAILS:
+          - Topic: "${overview}"
+          - Daily Time: ${dailyCapacityMinutes} minutes
+          - Duration: ${totalGoalDays} day(s)
+          - Start Date: ${formattedStartDate}
+
+          STRUCTURE OF THE RESPONSE:
+          1. Plan Overview: A concise 3 to 5 line expert summary of the strategy and feasibility.
           
-          Return JSON:
+          2. My Study Plan (Table): 
+             A table titled "My Study Plan:" with headers "Topic | Date | Session | Minutes".
+             IMPORTANT: Each row MUST have a unique, descriptive sub-topic (e.g., Afternoon: Closure & Scopes).
+             
+          AI RULES:
+          - You MUST generate exactly ${totalGoalDays * 3} sessions in the 'subtopics' array.
+          - Minutes must sum to exactly ${dailyCapacityMinutes} per day.
+          - Total sessions = ${totalGoalDays * 3}.
+
+          JSON SCHEMA (Strict):
           {
             "subtopics": [
-              { "title": "Professional Title", "description": "Specific learning tasks...", "estimatedMinutes": 60 }
+              { "title": "Day 1: [Topic] (Morning)", "description": "• Task (60m)...", "estimatedMinutes": integer }
             ],
-            "feasibilityAnalysis": "Expert assessment of this plan."
+            "feasibilityAnalysis": "# Plan Overview\\n[3-5 lines of expert strategy]\\n\\n# My Study Plan\\nTopic | Date | Session | Minutes\\n[Row 1]...\\n[Row 2]..."
           }
+
+          Note: Dates start at ${formattedStartDate}. Each day has Morning/Afternoon/Evening.
+          RETURN RAW JSON ONLY. NO MARKDOWN CODE BLOCKS.
         `;
 
         const responseResult = await activeModel.generateContent(prompt);
         const response = await responseResult.response;
-        const text = response.text().trim();
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        const jsonString = jsonMatch ? jsonMatch[0] : text;
-        const parsed = JSON.parse(jsonString);
+        const text = (await response.text()).trim();
+
+        let parsed = {};
+        try {
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          const jsonString = jsonMatch ? jsonMatch[0] : text;
+          parsed = JSON.parse(jsonString);
+        } catch (jsonErr) {
+          throw new Error("Failed to parse AI JSON response: " + jsonErr.message);
+        }
 
         if (parsed.subtopics && Array.isArray(parsed.subtopics)) {
           result = parsed;
           success = true;
-          console.log(`AI Success with model: ${modelName}`);
           break;
         }
       } catch (err) {
-        const errMsg = err.message || "Unknown error";
-        console.warn(`Model ${modelName} failed: ${errMsg}`);
-        modelErrors.push(`${modelName}: ${errMsg}`);
+        modelErrors.push(`${modelName}: ${err.message}`);
       }
     }
 
-    if (!success) {
-      const errorDetail = modelErrors.join(" | ");
-      throw new Error(`All models failed. Details: ${errorDetail}`);
-    }
+    if (!success) throw new Error(modelErrors.join(" | "));
     return result;
   } catch (error) {
     console.error("AI Fallback triggered. Final Error:", error.message);
+
     const subtopics = [];
     const toTitleCase = (str) => str.replace(/\b\w/g, (l) => l.toUpperCase());
     const cleanTopic = overview
@@ -135,7 +150,7 @@ const generateSubtopicsFromAI = async (
           title: `Evening: ${mainTitle} - Review`,
           description: `Recap and final consolidation of today's learning.`,
           estimatedMinutes: Math.floor(dailyCapacityMinutes * 0.3),
-        },
+        }
       );
     } else {
       for (let day = 1; day <= totalGoalDays; day++) {
@@ -149,7 +164,7 @@ const generateSubtopicsFromAI = async (
 
     return {
       subtopics,
-      feasibilityAnalysis: `AI Connection Error: "${error.message}". This usually means your API Key is missing in Render or Google's servers are busy. Please check your Render "Environment" settings!`,
+      feasibilityAnalysis: `AI Connection Error: "${error.message}". Check your GEMINI_API_KEY or network connection.`,
     };
   }
 };
@@ -157,7 +172,7 @@ const generateSubtopicsFromAI = async (
 const provideReflectionFeedback = async (
   goal,
   reflectionText,
-  completionPercentage,
+  completionPercentage
 ) => {
   const isAiEnabled =
     process.env.USE_GEMINI === "true" && process.env.GEMINI_API_KEY;
@@ -169,25 +184,52 @@ const provideReflectionFeedback = async (
   try {
     const apiKey = process.env.GEMINI_API_KEY || "";
     const genAI = new GoogleGenerativeAI(apiKey);
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-flash-latest",
+      "gemini-flash-lite-latest",
+      "gemini-1.5-flash-002",
+      "gemini-1.5-flash-8b",
+    ];
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-    });
+    let feedback = "";
+    let success = false;
+    let errors = [];
 
-    const prompt = `
-      You are an AI study coach. A student has a goal: "${goal.title}" (${goal.overview}).
-      They just wrote a reflection on their progress: "${reflectionText}"
-      They completed ${completionPercentage}% of their goal for this period.
-      
-      Based on this, provide a 2-3 sentence encouraging and constructive piece of advice to help them stay on track or improve next time.
-      Be personal and refer to their goal or reflection specifically.
-    `;
+    for (const modelName of modelsToTry) {
+      try {
+        if (errors.length > 0) {
+           await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const prompt = `
+          You are an AI study coach. A student has a goal: "${goal.title}" (${goal.overview}).
+          They just wrote a reflection on their progress: "${reflectionText}"
+          They completed ${completionPercentage}% of their goal for this period.
+          
+          Based on this, provide a 2-3 sentence encouraging and constructive piece of advice to help them stay on track or improve next time.
+          Be personal and refer to their goal or reflection specifically.
+        `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text().trim();
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        feedback = (await response.text()).trim();
+        success = true;
+        break;
+      } catch (err) {
+        console.warn(`Reflection AI model ${modelName} failed: ${err.message}`);
+        errors.push(err.message || "Unknown error");
+      }
+    }
+
+    if (!success) {
+      throw new Error("All models failed for reflection feedback.");
+    }
+
+    return feedback;
   } catch (error) {
-    console.error("Gemini reflection feedback error:", error.message || error);
+    console.error("Gemini reflection feedback final error:", error.message || error);
     return "Keep up the good work! Consistent reflection is the secret to long-term success.";
   }
 };

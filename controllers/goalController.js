@@ -50,11 +50,12 @@ exports.createGoal = async (req, res) => {
         : Math.max(1, require("date-fns").differenceInDays(end, start) + 1);
     const totalLearningMinutes = dailyCapacityMinutes * totalGoalDays;
 
-    // 2. Generate Subtopics using AI (tell it the TOTAL time to fill and number of days)
+    // 2. Generate Subtopics using AI
     const aiResponse = await generateSubtopicsFromAI(
       overview,
-      totalLearningMinutes,
+      dailyCapacityMinutes,
       totalGoalDays,
+      start,
     );
     const { subtopics, feasibilityAnalysis } = aiResponse;
 
@@ -180,8 +181,9 @@ exports.updateGoal = async (req, res) => {
 
       const aiResponse = await generateSubtopicsFromAI(
         goal.overview,
-        totalLearningMinutes,
+        goal.dailyCapacityMinutes,
         totalGoalDays,
+        goal.startDate,
       );
       const { subtopics, feasibilityAnalysis } = aiResponse;
 
